@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RefreshCw, Download, FileText, AlertCircle } from 'lucide-react';
 
-const FileList = () => {
+const FileList = ({ active = true }) => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -32,15 +32,20 @@ const FileList = () => {
     }
   };
 
-  // Load files on component mount and set up auto-refresh
+  // Load files on component mount and set up auto-refresh only when active
   useEffect(() => {
+    if (!active) {
+      setLoading(false);
+      return;
+    }
+
     fetchFiles();
     
-    // Auto-refresh every 30 seconds to catch new uploads
+    // Auto-refresh every 30 seconds to catch new uploads only when active
     const interval = setInterval(fetchFiles, 30000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [active]);
 
   // Refresh files
   const handleRefresh = () => {
@@ -67,6 +72,25 @@ const FileList = () => {
   const handleDownload = (file) => {
     window.open(file.url, '_blank');
   };
+
+  // Show inactive state when not active
+  if (!active) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Uploaded Files</CardTitle>
+          <CardDescription>Files uploaded to the server</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>Switch to this tab to view uploaded files</p>
+            <p className="text-sm mt-2">Files are fetched only when actively viewing to save bandwidth</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (loading) {
     return (
