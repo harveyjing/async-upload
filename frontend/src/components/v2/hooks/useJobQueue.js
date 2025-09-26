@@ -16,9 +16,7 @@ const createJob = (formData, files) => ({
   createdAt: new Date().toISOString(),
   status: JOB_STATUS.PENDING,
   formData: {
-    jobName: formData.jobName,
-    description: formData.description,
-    priority: formData.priority
+    jobName: formData.jobName
   },
   files: files.map((file, index) => ({
     id: uuidv4(),

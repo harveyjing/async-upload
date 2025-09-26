@@ -5,10 +5,16 @@ import V1Page from "./pages/V1Page";
 import V2Page from "./pages/V2Page";
 import { useJobQueueContext } from "./components/v2/hooks/JobQueueContext";
 import FloatingUploadWidget from "./components/v2/FloatingUploadWidget";
+import { useBeforeUnload } from "./components/v2/hooks/useBeforeUnload";
 
 function App() {
   const jobQueue = useJobQueueContext();
-  console.log('jobQueue', jobQueue);
+
+  // Enable beforeunload warning when there are active jobs
+  useBeforeUnload(true, 
+    'You have active upload jobs in progress. Leaving this page will cancel all ongoing uploads and they cannot be resumed. Are you sure you want to leave?'
+  );
+  
   return (
     <>  
       <Router>

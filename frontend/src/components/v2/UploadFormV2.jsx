@@ -3,23 +3,17 @@ import FileUpload from '../FileUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, Upload, Clock, AlertCircle } from 'lucide-react';
 import { useJobQueueContext } from './hooks/JobQueueContext';
 import { useAsyncUpload } from './hooks/useAsyncUpload';
 import { useNotifications } from './hooks/useNotifications';
-import JobQueue from './JobQueue';
 import NotificationToast from './NotificationToast';
-import FloatingUploadWidget from './FloatingUploadWidget';
 
 const UploadFormV2 = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [formData, setFormData] = useState({
-    jobName: '',
-    description: '',
-    priority: 'normal'
+    jobName: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -74,9 +68,7 @@ const UploadFormV2 = () => {
       // Step 4: Reset form for next submission
       setSelectedFiles([]);
       setFormData({
-        jobName: '',
-        description: '',
-        priority: 'normal'
+        jobName: ''
       });
       
       // Show info about background processing
@@ -159,41 +151,6 @@ const UploadFormV2 = () => {
                   placeholder="Enter job name"
                   required
                 />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="description" className="text-sm font-medium">
-                  Description
-                </label>
-                <Textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  rows={3}
-                  placeholder="Enter job description (optional)"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="priority" className="text-sm font-medium">
-                  Priority
-                </label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 

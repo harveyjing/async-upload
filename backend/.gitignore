@@ -24,7 +24,7 @@ go.work
 *.swo
 
 # Upload directory
-uploads/
+uploads/*
 !uploads/.gitkeep
 
 # Environment files

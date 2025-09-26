@@ -9,6 +9,8 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, XCircle, AlertCircle, Upload } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+import { uploadFiles, submitJob } from './v2/services/uploadService';
 
 const UploadForm = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -36,99 +38,33 @@ const UploadForm = () => {
     }));
   };
 
-  // Real API function to upload a single file
-  const uploadSingleFile = async (file, onProgress) => {
-    const formData = new FormData();
-    formData.append('file', file);
+  // Upload all files with job ID
+  const uploadFilesWithProgress = async (files, jobId) => {
+    const onFileProgress = (fileIndex, progress) => {
+      setUploadProgress(prev => ({
+        ...prev,
+        [fileIndex]: progress
+      }));
+    };
 
-    try {
-      // Simulate progress since XMLHttpRequest provides better progress tracking
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            onProgress(progress);
-          }
-        });
-
-        xhr.onload = function() {
-          if (xhr.status === 200) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              resolve(response);
-            } catch (error) {
-              reject(new Error(`Invalid response format for ${file.name}`));
-            }
-          } else {
-            try {
-              const errorResponse = JSON.parse(xhr.responseText);
-              reject(new Error(errorResponse.error || `Upload failed for ${file.name}`));
-            } catch (error) {
-              reject(new Error(`Upload failed for ${file.name}`));
-            }
-          }
-        };
-
-        xhr.onerror = function() {
-          reject(new Error(`Network error uploading ${file.name}`));
-        };
-
-        xhr.open('POST', `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/upload`);
-        xhr.send(formData);
-      });
-    } catch (error) {
-      throw new Error(`Upload failed for ${file.name}: ${error.message}`);
-    }
-  };
-
-  // Upload all files
-  const uploadFiles = async (files) => {
-    const uploadPromises = files.map(async (file, index) => {
-      try {
-        const result = await uploadSingleFile(file, (progress) => {
-          setUploadProgress(prev => ({
-            ...prev,
-            [index]: progress
-          }));
-        });
-        return result;
-      } catch (error) {
+    const results = await uploadFiles(files, onFileProgress, null, jobId);
+    
+    // Handle errors and convert to the expected format
+    const processedResults = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.error) {
         setUploadProgress(prev => ({
           ...prev,
-          [index]: 'error'
+          [i]: 'error'
         }));
-        throw error;
+        throw result.error;
+      } else {
+        processedResults.push(result.result);
       }
-    });
-
-    return Promise.all(uploadPromises);
-  };
-
-  // Real API function to submit job
-  const submitJob = async (jobData) => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(jobData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Job submission failed');
-      }
-
-      return await response.json();
-    } catch (error) {
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error('Cannot connect to backend server. Please ensure the server is running.');
-      }
-      throw error;
     }
+    
+    return processedResults;
   };
 
   // Handle form submission (blocking async upload)
@@ -144,15 +80,16 @@ const UploadForm = () => {
     }
 
     try {
-      // Step 1: Disable form and show loading state
+      // Step 1: Generate job ID and disable form
+      const jobId = uuidv4();
       setIsSubmitting(true);
       setNotification({
         type: 'info',
         message: 'Uploading files...'
       });
       
-      // Step 2: Upload files first (blocking)
-      const uploadedFiles = await uploadFiles(selectedFiles);
+      // Step 2: Upload files first (blocking) with job ID
+      const uploadedFiles = await uploadFilesWithProgress(selectedFiles, jobId);
       
       setNotification({
         type: 'info',
@@ -175,7 +112,7 @@ const UploadForm = () => {
       // Step 4: Show success notification
       setNotification({
         type: 'success',
-        message: `Job submitted successfully! Job ID: ${jobResult.id}. All ${uploadedFiles.length} files have been uploaded.`
+        message: `Job submitted successfully! Job ID: ${jobResult.id}. All ${uploadedFiles.length} files have been uploaded and organized in job folder.`
       });
       
       // Reset form

@@ -3,25 +3,28 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { RefreshCw, Download, FileText, AlertCircle } from 'lucide-react';
+import { RefreshCw, Download, FileText, AlertCircle, Folder, ArrowLeft } from 'lucide-react';
 
 const FileList = ({ active = true }) => {
-  const [files, setFiles] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentPath, setCurrentPath] = useState('');
 
   // Fetch files from the API
-  const fetchFiles = async () => {
+  const fetchFiles = async (path = '') => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/files`);
+      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/files${path ? `?path=${encodeURIComponent(path)}` : ''}`;
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error('Failed to fetch files');
       }
       
       const data = await response.json();
-      setFiles(data.files || []);
+      setItems(data.items || []);
+      setCurrentPath(path);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -39,18 +42,18 @@ const FileList = ({ active = true }) => {
       return;
     }
 
-    fetchFiles();
+    fetchFiles(currentPath);
     
     // Auto-refresh every 30 seconds to catch new uploads only when active
-    const interval = setInterval(fetchFiles, 30000);
+    const interval = setInterval(() => fetchFiles(currentPath), 30000);
     
     return () => clearInterval(interval);
-  }, [active]);
+  }, [active, currentPath]);
 
   // Refresh files
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchFiles();
+    fetchFiles(currentPath);
   };
 
   // Format file size
@@ -72,6 +75,30 @@ const FileList = ({ active = true }) => {
   const handleDownload = (file) => {
     window.open(file.url, '_blank');
   };
+
+  // Navigate to directory
+  const handleDirectoryClick = (dirName) => {
+    const newPath = currentPath ? `${currentPath}/${dirName}` : dirName;
+    fetchFiles(newPath);
+  };
+
+  // Navigate back
+  const handleBackClick = () => {
+    const pathParts = currentPath.split('/');
+    pathParts.pop();
+    const newPath = pathParts.join('/');
+    fetchFiles(newPath);
+  };
+
+  // Get breadcrumb path
+  const getBreadcrumbPath = () => {
+    if (!currentPath) return 'Root';
+    return currentPath.split('/').join(' / ');
+  };
+
+  // Calculate total files and directories
+  const totalFiles = items.filter(item => !item.isDir).length;
+  const totalDirs = items.filter(item => item.isDir).length;
 
   // Show inactive state when not active
   if (!active) {
@@ -109,21 +136,34 @@ const FileList = ({ active = true }) => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Uploaded Files</CardTitle>
+              <CardTitle>File Browser</CardTitle>
               <CardDescription>
-                Manage and download your uploaded files
+                {getBreadcrumbPath()}
               </CardDescription>
             </div>
-            <Button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              variant="outline"
-              size="sm"
-              className="h-8 px-3"
-            >
-              <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="text-xs">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
-            </Button>
+            <div className="flex items-center space-x-2">
+              {currentPath && (
+                <Button
+                  onClick={handleBackClick}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3"
+                >
+                  <ArrowLeft className="h-3 w-3 mr-1" />
+                  <span className="text-xs">Back</span>
+                </Button>
+              )}
+              <Button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                variant="outline"
+                size="sm"
+                className="h-8 px-3"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                <span className="text-xs">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
@@ -137,47 +177,68 @@ const FileList = ({ active = true }) => {
             </Alert>
           )}
 
-          {files.length === 0 ? (
+          {items.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No files uploaded yet</h3>
-              <p className="text-muted-foreground">Files you upload will appear here.</p>
+              <h3 className="text-lg font-medium mb-2">{currentPath ? 'Empty directory' : 'No files uploaded yet'}</h3>
+              <p className="text-muted-foreground">{currentPath ? 'This directory is empty.' : 'Files you upload will appear here.'}</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {files.map((file) => (
-                <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              {/* File and Directory List */}
+              {items.map((item) => (
+                <div 
+                  key={item.name} 
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div 
+                    className={`flex items-center space-x-3 flex-1 min-w-0 ${item.isDir ? 'cursor-pointer' : ''}`}
+                    onClick={() => item.isDir && handleDirectoryClick(item.name)}
+                  >
+                    {item.isDir ? (
+                      <Folder className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-sm">{file.name}</p>
+                      <p className="font-medium truncate text-sm">{item.name}</p>
                       <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                        <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                          {formatFileSize(file.size)}
-                        </Badge>
+                        {item.isDir ? (
+                          <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                            Directory
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                            {formatFileSize(item.size)}
+                          </Badge>
+                        )}
                         <span>•</span>
-                        <span className="truncate">{formatDate(file.uploadedAt)}</span>
+                        <span className="truncate">{formatDate(item.uploadedAt)}</span>
                       </div>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => handleDownload(file)}
-                    variant="outline"
-                    size="sm"
-                    className="ml-2 h-8 px-2"
-                  >
-                    <Download className="h-3 w-3" />
-                  </Button>
+                  {!item.isDir && (
+                    <Button
+                      onClick={() => handleDownload(item)}
+                      variant="outline"
+                      size="sm"
+                      className="ml-2 h-7 px-2"
+                    >
+                      <Download className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               ))}
               
-              {files.length > 0 && (
-                <div className="text-center pt-4 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    Total: {files.length} file{files.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              )}
+              {/* Summary */}
+              <div className="text-center pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  {totalDirs > 0 && `${totalDirs} director${totalDirs !== 1 ? 'ies' : 'y'}`}
+                  {totalDirs > 0 && totalFiles > 0 && ', '}
+                  {totalFiles > 0 && `${totalFiles} file${totalFiles !== 1 ? 's' : ''}`}
+                  {totalDirs === 0 && totalFiles === 0 && 'No items'}
+                </p>
+              </div>
             </div>
           )}
         </CardContent>

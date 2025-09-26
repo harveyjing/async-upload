@@ -1,8 +1,3 @@
-import { Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Upload, Zap, ArrowRight } from 'lucide-react';
-
 const HomePage = () => {
   return (
     <div className="min-h-screen bg-background">
@@ -17,70 +12,8 @@ const HomePage = () => {
           </div>
 
           {/* Version Comparison */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Version 1 Card */}
-            <Card className="relative">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Upload className="w-6 h-6" />
-                  <CardTitle className="text-xl">Version 1</CardTitle>
-                </div>
-                <CardDescription>
-                  Traditional blocking upload approach
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <ul className="space-y-2 text-sm">
-                  <li>• Synchronous file uploads</li>
-                  <li>• User waits for completion</li>
-                  <li>• Form disabled during upload</li>
-                  <li>• Progress tracking</li>
-                  <li>• Sequential processing</li>
-                </ul>
-                <Link to="/v1">
-                  <Button className="w-full">
-                    Try Version 1
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* Version 2 Card */}
-            <Card className="relative border-primary/20 bg-primary/5">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Zap className="w-6 h-6 text-primary" />
-                  <CardTitle className="text-xl">Version 2</CardTitle>
-                  <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
-                    NEW
-                  </span>
-                </div>
-                <CardDescription>
-                  Modern async upload with background processing
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <ul className="space-y-2 text-sm">
-                  <li>• ✨ Instant job submission</li>
-                  <li>• 🚀 Background file processing</li>
-                  <li>• 📋 Job queue management</li>
-                  <li>• 🔔 Real-time notifications</li>
-                  <li>• 📱 Non-blocking interface</li>
-                  <li>• ⚠️ In-memory state (lost on refresh)</li>
-                </ul>
-                <Link to="/v2">
-                  <Button className="w-full" variant="default">
-                    Try Version 2
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Key Differences */}
-          <Card>
+          {/* <Card>
             <CardHeader>
               <CardTitle>Key Differences</CardTitle>
               <CardDescription>
@@ -127,7 +60,7 @@ const HomePage = () => {
                 </table>
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Footer */}
           <div className="text-center text-muted-foreground">

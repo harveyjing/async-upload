@@ -2,7 +2,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 // Upload a single file with progress tracking
-export const uploadSingleFile = async (file, onProgress) => {
+export const uploadSingleFile = async (file, onProgress, jobName = null) => {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -29,9 +29,23 @@ export const uploadSingleFile = async (file, onProgress) => {
       } else {
         try {
           const errorResponse = JSON.parse(xhr.responseText);
-          reject(new Error(errorResponse.error || `Upload failed for ${file.name}`));
+          
+          // Handle specific error cases
+          if (xhr.status === 409) {
+            reject(new Error(`Job directory already exists: ${errorResponse.error || 'Directory conflict'}`));
+          } else if (xhr.status === 400 && errorResponse.error?.includes('X-Job-Name header')) {
+            reject(new Error(`Job name is required: ${errorResponse.error}`));
+          } else {
+            reject(new Error(errorResponse.error || `Upload failed for ${file.name}`));
+          }
         } catch (error) {
-          reject(new Error(`Upload failed for ${file.name}: HTTP ${xhr.status}`));
+          if (xhr.status === 409) {
+            reject(new Error(`Job directory already exists for ${file.name}`));
+          } else if (xhr.status === 400) {
+            reject(new Error(`Job name is required for ${file.name}`));
+          } else {
+            reject(new Error(`Upload failed for ${file.name}: HTTP ${xhr.status}`));
+          }
         }
       }
     };
@@ -51,6 +65,12 @@ export const uploadSingleFile = async (file, onProgress) => {
 
     // Start upload
     xhr.open('POST', `${API_BASE_URL}/api/upload`);
+    
+    // Add job name as header if provided
+    if (jobName) {
+      xhr.setRequestHeader('X-Job-Name', jobName);
+    }
+    
     xhr.send(formData);
   });
 };
@@ -68,7 +88,13 @@ export const submitJob = async (jobData) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Job submission failed');
+      
+      // Handle specific error cases
+      if (response.status === 409) {
+        throw new Error(`Job directory already exists: ${errorData.error || 'Directory conflict'}`);
+      } else {
+        throw new Error(errorData.error || 'Job submission failed');
+      }
     }
 
     return await response.json();
@@ -81,7 +107,7 @@ export const submitJob = async (jobData) => {
 };
 
 // Upload multiple files sequentially with individual progress tracking
-export const uploadFiles = async (files, onFileProgress, onOverallProgress) => {
+export const uploadFiles = async (files, onFileProgress, onOverallProgress, jobName = null) => {
   const results = [];
   const totalFiles = files.length;
   
@@ -96,7 +122,7 @@ export const uploadFiles = async (files, onFileProgress, onOverallProgress) => {
       // Upload single file
       const result = await uploadSingleFile(file, (progress) => {
         onFileProgress?.(i, progress);
-      });
+      }, jobName);
       
       results.push({ index: i, result, error: null });
       
@@ -114,12 +140,12 @@ export const uploadFiles = async (files, onFileProgress, onOverallProgress) => {
 };
 
 // Upload files in parallel (alternative approach for faster uploads)
-export const uploadFilesParallel = async (files, onFileProgress, onOverallProgress) => {
+export const uploadFilesParallel = async (files, onFileProgress, onOverallProgress, jobName = null) => {
   const uploadPromises = files.map(async (file, index) => {
     try {
       const result = await uploadSingleFile(file, (progress) => {
         onFileProgress?.(index, progress);
-      });
+      }, jobName);
       return { index, result, error: null };
     } catch (error) {
       return { index, result: null, error };

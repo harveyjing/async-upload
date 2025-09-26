@@ -23,11 +23,11 @@ dev: build up
 
 build:
 	@echo "🏗️  Building Docker images..."
-	docker-compose build
+	docker compose build
 
 up:
 	@echo "🚀 Starting development environment..."
-	docker-compose up -d
+	docker compose up -d
 	@echo "✅ Services started!"
 	@echo "Frontend: http://localhost:3000"
 	@echo "Backend:  http://localhost:8080"
@@ -35,33 +35,33 @@ up:
 
 down:
 	@echo "🛑 Stopping services..."
-	docker-compose down
+	docker compose down
 
 logs:
-	docker-compose logs
+	docker compose logs
 
 logs-f:
-	docker-compose logs -f
+	docker compose logs -f
 # Utility commands
 clean:
 	@echo "🧹 Cleaning up containers and images..."
-	docker-compose down --rmi all --remove-orphans
+	docker compose down --rmi all --remove-orphans
 	docker system prune -f
 
 clean-all:
 	@echo "🧹 Cleaning everything including volumes..."
-	docker-compose down --rmi all --volumes --remove-orphans
+	docker compose down --rmi all --volumes --remove-orphans
 	docker system prune -af --volumes
 
 # Development helpers
 restart:
 	@echo "🔄 Restarting services..."
-	docker-compose restart
+	docker compose restart
 
 restart-be:
 	@echo "🔄 Restarting backend..."
-	docker-compose restart backend
+	docker compose restart backend
 
 restart-fe:
 	@echo "🔄 Restarting frontend..."
-	docker-compose restart frontend
+	docker compose restart frontend

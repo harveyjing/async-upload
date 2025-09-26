@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type Config struct {
@@ -21,23 +19,28 @@ type Config struct {
 }
 
 type FileUploadResponse struct {
-	ID   string `json:"id"`
 	URL  string `json:"url"`
 	Name string `json:"name"`
 	Size int64  `json:"size"`
 }
 
 type JobSubmissionRequest struct {
-	JobName     string               `json:"jobName"`
-	Description string               `json:"description"`
-	Priority    string               `json:"priority"`
-	Files       []FileUploadResponse `json:"files"`
+	JobName string `json:"jobName"`
 }
 
 type JobSubmissionResponse struct {
-	ID      string `json:"id"`
 	Status  string `json:"status"`
 	Message string `json:"message"`
+}
+
+type JobInfo struct {
+	Name      string `json:"name"`
+	CreatedAt string `json:"createdAt"`
+	FileCount int    `json:"fileCount"`
+}
+
+type JobListResponse struct {
+	Jobs []JobInfo `json:"jobs"`
 }
 
 type ErrorResponse struct {
@@ -45,16 +48,15 @@ type ErrorResponse struct {
 }
 
 type FileInfo struct {
-	ID         string `json:"id"`
 	Name       string `json:"name"`
 	Size       int64  `json:"size"`
 	URL        string `json:"url"`
 	UploadedAt string `json:"uploadedAt"`
+	IsDir      bool   `json:"isDir"`
 }
 
 type FilesListResponse struct {
-	Files []FileInfo `json:"files"`
-	Total int        `json:"total"`
+	Items []FileInfo `json:"items"`
 }
 
 var config = Config{
@@ -89,7 +91,7 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Job-Name")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
@@ -113,7 +115,21 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse multipart form with max memory
+	// Read headers first for quick validation
+	jobName := r.Header.Get("X-Job-Name")
+	if jobName == "" {
+		respondWithError(w, "Job name is required in X-Job-Name header", http.StatusBadRequest)
+		return
+	}
+
+	// Check if job directory already exists (quick validation before reading body)
+	jobDir := filepath.Join(config.UploadDir, jobName)
+	// if _, err := os.Stat(jobDir); err == nil {
+	// 	respondWithError(w, fmt.Sprintf("Job directory '%s' already exists", jobName), http.StatusConflict)
+	// 	return
+	// }
+
+	// Now parse multipart form only after validation passes
 	err := r.ParseMultipartForm(32 << 20) // 32MB in memory
 	if err != nil {
 		respondWithError(w, "Failed to parse multipart form", http.StatusBadRequest)
@@ -133,11 +149,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate unique filename
-	fileID := uuid.New().String()
-	fileExt := filepath.Ext(header.Filename)
-	fileName := fileID + fileExt
-	filePath := filepath.Join(config.UploadDir, fileName)
+	// Create job-specific directory using job name
+	if err := os.MkdirAll(jobDir, 0755); err != nil {
+		respondWithError(w, "Failed to create job directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Use original filename
+	filePath := filepath.Join(jobDir, header.Filename)
 
 	// Create the file
 	dst, err := os.Create(filePath)
@@ -157,8 +176,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Prepare response
 	response := FileUploadResponse{
-		ID:   fileID,
-		URL:  fmt.Sprintf("http://localhost:%s/api/files/%s", config.Port, fileName),
+		URL:  fmt.Sprintf("http://localhost:%s/api/files/%s/%s", config.Port, jobName, header.Filename),
 		Name: header.Filename,
 		Size: header.Size,
 	}
@@ -166,7 +184,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 
-	log.Printf("File uploaded successfully: %s (ID: %s, Size: %d bytes)", header.Filename, fileID, header.Size)
+	log.Printf("File uploaded successfully: %s (Job: %s, Size: %d bytes)", header.Filename, jobName, header.Size)
 }
 
 // Job submission handler
@@ -189,36 +207,22 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Files) == 0 {
-		respondWithError(w, "At least one file is required", http.StatusBadRequest)
+	// Create job directory if it doesn't exist
+	jobDir := filepath.Join(config.UploadDir, req.JobName)
+	if err := os.MkdirAll(jobDir, 0755); err != nil {
+		respondWithError(w, "Failed to create job directory", http.StatusInternalServerError)
 		return
 	}
 
-	// Validate priority
-	validPriorities := map[string]bool{"low": true, "normal": true, "high": true}
-	if !validPriorities[req.Priority] {
-		req.Priority = "normal" // Default to normal if invalid
-	}
-
-	// Generate job ID
-	jobID := uuid.New().String()
-
-	// In a real implementation, you would:
-	// 1. Store job metadata in a database
-	// 2. Queue the job for processing
-	// 3. Return job tracking information
-
 	response := JobSubmissionResponse{
-		ID:      jobID,
 		Status:  "submitted",
-		Message: fmt.Sprintf("Job '%s' submitted successfully with %d files", req.JobName, len(req.Files)),
+		Message: fmt.Sprintf("Job '%s' submitted successfully", req.JobName),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 
-	log.Printf("Job submitted: ID=%s, Name=%s, Files=%d, Priority=%s",
-		jobID, req.JobName, len(req.Files), req.Priority)
+	log.Printf("Job submitted: Name=%s", req.JobName)
 }
 
 // File serving handler
@@ -228,12 +232,22 @@ func serveFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract filename from URL path
-	fileName := strings.TrimPrefix(r.URL.Path, "/api/files/")
-	if fileName == "" {
-		http.Error(w, "File name required", http.StatusBadRequest)
+	// Extract path from URL: /api/files/jobName/filename
+	urlPath := strings.TrimPrefix(r.URL.Path, "/api/files/")
+	if urlPath == "" {
+		http.Error(w, "File path required", http.StatusBadRequest)
 		return
 	}
+
+	// Parse the path to extract job name and filename
+	pathParts := strings.Split(urlPath, "/")
+	if len(pathParts) != 2 {
+		http.Error(w, "Invalid file path format", http.StatusBadRequest)
+		return
+	}
+
+	jobName := pathParts[0]
+	fileName := pathParts[1]
 
 	// Validate filename (prevent directory traversal)
 	if strings.Contains(fileName, "..") || strings.Contains(fileName, "/") {
@@ -241,7 +255,14 @@ func serveFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := filepath.Join(config.UploadDir, fileName)
+	var filePath string
+	if jobName == "root" {
+		// Handle root files (files in the uploads directory root)
+		filePath = filepath.Join(config.UploadDir, fileName)
+	} else {
+		// Handle files in job directories
+		filePath = filepath.Join(config.UploadDir, jobName, fileName)
+	}
 
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -253,57 +274,74 @@ func serveFileHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filePath)
 }
 
-// List uploaded files handler
+// List files and directories handler
 func listFilesHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Read the uploads directory
-	files, err := os.ReadDir(config.UploadDir)
-	if err != nil {
-		respondWithError(w, "Failed to read uploads directory", http.StatusInternalServerError)
+	// Get path parameter to support browsing subdirectories
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		path = "" // Root directory
+	}
+
+	// Validate path (prevent directory traversal)
+	if strings.Contains(path, "..") {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
 
-	var fileInfos []FileInfo
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
+	targetDir := filepath.Join(config.UploadDir, path)
 
-		fileInfo, err := file.Info()
+	// Read the target directory
+	entries, err := os.ReadDir(targetDir)
+	if err != nil {
+		respondWithError(w, "Failed to read directory", http.StatusInternalServerError)
+		return
+	}
+
+	var items []FileInfo
+	for _, entry := range entries {
+		fileInfo, err := entry.Info()
 		if err != nil {
-			log.Printf("Failed to get file info for %s: %v", file.Name(), err)
+			log.Printf("Failed to get file info for %s: %v", entry.Name(), err)
 			continue
 		}
 
-		// Extract original filename and file ID from the filename
-		// Format: {uuid}.{ext} where original name is lost
-		// For now, we'll use the filename as is
-		fileName := file.Name()
-		fileID := strings.TrimSuffix(fileName, filepath.Ext(fileName))
-
-		fileData := FileInfo{
-			ID:         fileID,
-			Name:       fileName, // In a real app, you'd store original names in a database
-			Size:       fileInfo.Size(),
-			URL:        fmt.Sprintf("http://localhost:%s/api/files/%s", config.Port, fileName),
-			UploadedAt: fileInfo.ModTime().Format(time.RFC3339),
+		var itemURL string
+		if entry.IsDir() {
+			// For directories, URL points to list endpoint with path parameter
+			subPath := filepath.Join(path, entry.Name())
+			itemURL = fmt.Sprintf("http://localhost:%s/api/files?path=%s", config.Port, subPath)
+		} else {
+			// For files, URL points to file serving endpoint
+			if path == "" {
+				itemURL = fmt.Sprintf("http://localhost:%s/api/files/root/%s", config.Port, entry.Name())
+			} else {
+				itemURL = fmt.Sprintf("http://localhost:%s/api/files/%s/%s", config.Port, path, entry.Name())
+			}
 		}
-		fileInfos = append(fileInfos, fileData)
+
+		item := FileInfo{
+			Name:       entry.Name(),
+			Size:       fileInfo.Size(),
+			URL:        itemURL,
+			UploadedAt: fileInfo.ModTime().Format(time.RFC3339),
+			IsDir:      entry.IsDir(),
+		}
+		items = append(items, item)
 	}
 
 	response := FilesListResponse{
-		Files: fileInfos,
-		Total: len(fileInfos),
+		Items: items,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 
-	log.Printf("Listed %d files", len(fileInfos))
+	log.Printf("Listed %d items in path: %s", len(items), path)
 }
 
 // Helper function to send error responses

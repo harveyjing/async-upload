@@ -32,7 +32,9 @@ export const useAsyncUpload = () => {
       // Upload all files
       const uploadResults = await uploadFiles(
         selectedFiles,
-        onFileProgress
+        onFileProgress,
+        null, // overall progress callback (not used here)
+        job.formData.jobName // pass the job name to organize files by job
       );
 
       // Check for upload failures
@@ -51,7 +53,7 @@ export const useAsyncUpload = () => {
 
         // If all uploads failed, mark job as failed
         if (failedUploads.length === uploadResults.length) {
-          updateJobStatus(jobId, JOB_STATUS.FAILED, 'All file uploads failed');
+          updateJobStatus(jobId, JOB_STATUS.FAILED, failedUploads.map(f => f.error).join(', '));
           return;
         }
       }
@@ -59,13 +61,7 @@ export const useAsyncUpload = () => {
       // Step 2: Prepare job submission data
       const successfulUploads = uploadResults.filter(result => result.result);
       const jobSubmissionData = {
-        ...job.formData,
-        files: successfulUploads.map(({ result }) => ({
-          id: result.id,
-          url: result.url,
-          name: result.name,
-          size: result.size
-        }))
+        jobName: job.formData.jobName
       };
 
       // Step 3: Submit job to server

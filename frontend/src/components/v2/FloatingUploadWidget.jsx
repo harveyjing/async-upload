@@ -216,7 +216,7 @@ const FloatingUploadWidget = ({ jobQueue }) => {
           {/* Active Jobs */}
           {activeJobs.length > 0 && (
             <div className="mb-4">
-              <h3 className="text-xs font-semibold text-orange-600 mb-2 uppercase tracking-wide">
+              <h3 className="text-xs font-semibold text-green-600 mb-2 uppercase tracking-wide">
                 Active Uploads
               </h3>
               {activeJobs.map((job) => (
