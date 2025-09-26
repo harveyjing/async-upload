@@ -15,7 +15,7 @@ const FileList = ({ active = true }) => {
   // Fetch files from the API
   const fetchFiles = async (path = '') => {
     try {
-      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/files${path ? `?path=${encodeURIComponent(path)}` : ''}`;
+      const url = `/api/files${path ? `?path=${encodeURIComponent(path)}` : ''}`;
       const response = await fetch(url);
       
       if (!response.ok) {

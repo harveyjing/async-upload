@@ -13,6 +13,7 @@ services:
       - ./backend/uploads:/app/uploads
       # Mount source code for development (optional)
       # - ./backend:/app
+    user: "${UID}:${GID}"
     environment:
       - GO_ENV=development
     networks:

@@ -51,8 +51,8 @@ export const useAsyncUpload = () => {
           }
         });
 
-        // If all uploads failed, mark job as failed
-        if (failedUploads.length === uploadResults.length) {
+        // If any upload failed, mark job as failed
+        if (failedUploads.length > 0) {
           updateJobStatus(jobId, JOB_STATUS.FAILED, failedUploads.map(f => f.error).join(', '));
           return;
         }
@@ -61,7 +61,12 @@ export const useAsyncUpload = () => {
       // Step 2: Prepare job submission data
       const successfulUploads = uploadResults.filter(result => result.result);
       const jobSubmissionData = {
-        jobName: job.formData.jobName
+        jobName: job.formData.jobName,
+        files: successfulUploads.map(({ result }) => ({
+          id: result.id,
+          name: result.name,
+          size: result.size
+        }))
       };
 
       // Step 3: Submit job to server

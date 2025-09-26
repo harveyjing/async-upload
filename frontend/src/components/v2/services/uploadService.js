@@ -1,6 +1,3 @@
-// API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-
 // Upload a single file with progress tracking
 export const uploadSingleFile = async (file, onProgress, jobName = null) => {
   return new Promise((resolve, reject) => {
@@ -64,7 +61,7 @@ export const uploadSingleFile = async (file, onProgress, jobName = null) => {
     xhr.timeout = 30 * 60 * 1000;
 
     // Start upload
-    xhr.open('POST', `${API_BASE_URL}/api/upload`);
+    xhr.open('POST', '/api/upload');
     
     // Add job name as header if provided
     if (jobName) {
@@ -78,7 +75,7 @@ export const uploadSingleFile = async (file, onProgress, jobName = null) => {
 // Submit job data to the server
 export const submitJob = async (jobData) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/submit`, {
+    const response = await fetch('/api/submit', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
